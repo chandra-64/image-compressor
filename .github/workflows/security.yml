@@ -10,7 +10,7 @@ on:
 
 jobs:
 
-    build_and_run:
+    build_and_deploy:
         runs-on: ubuntu-latest 
 
         steps:
@@ -37,7 +37,7 @@ jobs:
                  "text": "Docker build failed on repo ${{ github.repository }}"
                  }
               env:
-                SLACK_WEBHOOK_URL : ${{secrets.SLACK_WEBHOOK_URL}}
+                SLACK_WEBHOOK_URL : ${{ secrets.SLACK_WEBHOOK_URL }}
             
             # Running Docker container
             - name: run docker image
@@ -47,7 +47,7 @@ jobs:
               run: |
                 docker run -d --name testrun -p 5000:5000 image_compressor:latest
                 sleep 5
-                curl -X POST -F "file=@/img/chill-bear.jpeg" http://127.0.0.1:5000/shrink --output img/panda_dell.jpg
+                curl -X POST -F "file=@img/chill-bear.jpeg" http://127.0.0.1:5000/shrink --output img/panda_dell.jpg
                 docker stop testrun
                 
              # Initiate Notification for running container with expected output successfully 
