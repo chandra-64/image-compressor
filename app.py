@@ -11,11 +11,9 @@ def shrink_image():
     
     file = request.files['file']
     
-    # Open the image and shrink it
     img = Image.open(file.stream)
     img.thumbnail((300, 300))
     
-    # Save to a byte buffer (instead of disk to keep it fast)
     img_io = io.BytesIO()
     img.save(img_io, 'JPEG', quality=70)
     img_io.seek(0)
