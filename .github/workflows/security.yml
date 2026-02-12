@@ -1,0 +1,106 @@
+name: image compressor
+
+on:
+    push:
+        branches: ["main"]
+    
+    pull_request:
+        branches: ["main"]
+
+jobs:
+
+    build_and_run:
+        runs-on: ubuntu-latest
+
+        steps:
+
+            - name: checkout code
+              uses: actions/checkout@v4 
+
+            - name: build docker image
+              id: "docker_build_status"
+              continue-on-error: true
+              run: docker build -t image_compressor .
+         
+            - name: failed docker build
+              if: steps.docker_build_status.outcome == 'failure'
+              uses: slackapi/slack-github-action@v1.26.0
+              with:
+                payload: |
+                 {
+                 "text": "Docker build failed on repo ${{ github.repository }}"
+                 }
+              env:
+                SLACK_WEBHOOK_URL : ${{secrets.SLACK_WEBHOOK_URL}}
+
+            - name: run docker image
+              if: steps.docker_build_status.outcome == 'success'
+              id: "docker_run_status"
+              continue-on-error: true
+              run: |
+                docker run -d --name testrun -p 5000:5000 image_compressor:latest
+                sleep 5
+                STATUS=$(curl -s -o img/result.jpg -w "%{http_code}" -F "file=@img/chill-bear.jpeg" http://localhost:5000/shrink)
+                if [ $STATUS -ne 200 ]; then echo "API returned $STATUS"; exit 1; fi  
+                if [ ! -s img/result.jpg ]; then echo "Result file is empty"; exit 1; fi              
+                docker stop testrun
+    
+            
+            - name: docker run success
+              if: steps.docker_run_status.outcome == 'success'
+              uses: slackapi/slack-github-action@v1.26.0
+              with:
+                payload: |
+                 {
+                 "text": "Docker build successfully on repo ${{ github.repository }}"
+                 }
+              env:
+                SLACK_WEBHOOK_URL : ${{secrets.SLACK_WEBHOOK_URL}}
+
+             
+            - name: Final Status Check
+              if: steps.docker_build_status.outcome == 'failure' || steps.docker_run_status.outcome == 'failure'
+              run: |
+                echo "The build or test failed"
+                exit 1
+
+            
+            - name: Trivy vulnerabililty scanner
+              uses: aquasecurity/trivy-action@master
+              with: 
+                image-ref: 'image_compressor'
+                format: 'table'
+                exit-code: '1'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+
+            - name: Login to dockerhub
+              uses: docker/login-action@v3
+              with:
+                username: ${{ secrets.DOCKER_USERNAME }}
+                password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: setup docker buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: docker push
+              uses: docker/build-push-action@v5
+
+              with: 
+                context: .
+                push: true
+
+                tags: |
+                 ${{ secrets.DOCKER_USERNAME }}/image-compressor:latest
+                 ${{ secrets.DOCKER_USERNAME }}/image-compressor:${{github.sha}}
+
+            - name: Slack on Success
+              if: success()
+              uses: slackapi/slack-github-action@v1.26.0
+              with:
+                payload: |
+                    {"text": "Image successfully scanned and pushed to DockerHub! Repo: ${{ github.repository }}"}
+              env:
+                SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+            
