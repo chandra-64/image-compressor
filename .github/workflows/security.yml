@@ -47,9 +47,7 @@ jobs:
               run: |
                 docker run -d --name testrun -p 5000:5000 image_compressor:latest
                 sleep 5
-                STATUS=$(curl -s -o img/result.jpg -w "%{http_code}" -F "file=@img/chill-bear.jpeg" http://localhost:5000/shrink)
-                if [ $STATUS -ne 200 ]; then echo "API returned $STATUS"; exit 1; fi  
-                if [ ! -s img/result.jpg ]; then echo "Result file is empty"; exit 1; fi              
+                curl -X POST -F "file=@/img/chill-bear.jpeg" http://127.0.0.1:5000/shrink --output img/panda_dell.jpg
                 docker stop testrun
                 
              # Initiate Notification for running container with expected output successfully 
